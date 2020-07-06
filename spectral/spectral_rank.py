@@ -9,7 +9,7 @@ class Aggregator():
     def __init__(self, epsilon):
         self.epsilon = epsilon
 
-    def aggregate_raw_statistics(self, data, n_items):
+    def aggregate_raw_statistics(self, data):
         """ Aggregate statistics
         """
         # Go through each comparison group but also keep track of the
@@ -18,6 +18,10 @@ class Aggregator():
 
         # Keep all the items in the universe
         self.all_items = set()
+
+        for group, choice in data:
+            self.all_items.update(group)
+        n_items = len(self.all_items)
 
         # Keep track of di
         self.ds_array  = np.zeros((n_items,))
@@ -32,17 +36,24 @@ class Aggregator():
                 group_choice[key] = collections.defaultdict(int)
             group_choice[key][choice] += 1
         
+        # TODO: fix the case where p_hat still contains negative number
+        # Refactor the connection between SpectralRank and Aggregator
         for group, choice in group_choice.items():
-            # Normalize to obtain the empircal estimates
-            m = choice / np.sum(choice)
+            # Get the m empirical estimate vector
+            group_items = list(group)
+
+            m = np.array([choice[item] for item in group_items])
+            m = m/ np.sum(m)
 
             if self.epsilon == np.inf:
                 p_hat = m
-                group_choice[group] = p_hat
             else:
                 p_hat = m * (1 + np.exp(self.epsilon))/(np.exp(self.epsilon) - 1)\
                     - 1./(np.exp(self.epsilon)+1)
-                group_choice[group] = self.project_to_probability_simplex(p_hat)
+                p_hat = self.project_to_probability_simplex(p_hat)
+
+            for i, item in enumerate(group_items):
+                group_choice[group][item] = p_hat[i]
 
         return group_choice
 
@@ -119,7 +130,7 @@ class SpectralRank():
         self.P = np.zeros((self.n, self.n))
         d = self.aggregator.ds_array
 
-        for (group, p_Sa) in self.group_choice:
+        for (group, p_Sa) in self.group_choice.items():
             for i in group:
                 for j in group:
                     self.P[i, j] += 1./d[i] * p_Sa[j]
@@ -138,4 +149,4 @@ class SpectralRank():
             self.pi = next_pi
 
         # Compute the scores
-        self.scores = self.pi / self.ds_array
+        self.scores = self.pi / self.aggregator.ds_array

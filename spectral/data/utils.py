@@ -18,9 +18,10 @@ def generate_data_MNL(N, weights, k):
 
     for i in range(N):
         group = np.random.choice(n, (k,), replace=False)
-        probs = [weights[i] for i in group]
-        winner = np.random.choice(group, 1, p=probs)
-        dataset.append((probs, winner))
+        probs = np.array([weights[i] for i in group])
+        probs = probs / np.sum(probs) # Normalize
+        winner = np.random.choice(group, 1, p=probs)[0]
+        dataset.append((group, winner))
 
     return dataset
 
