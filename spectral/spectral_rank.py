@@ -23,21 +23,15 @@ class Aggregator():
             self.all_items.update(group)
         n_items = len(self.all_items)
 
-        # Keep track of di
-        self.ds_array  = np.zeros((n_items,))
-
         for group, choice in data:
             key = frozenset(group)
             self.all_items.update(key)
-            for item in group:
-                self.ds_array[item] += 1
-            
             if key not in group_choice:
                 group_choice[key] = collections.defaultdict(int)
             group_choice[key][choice] += 1
         
         # TODO: fix the case where p_hat still contains negative number
-        # Refactor the connection between SpectralRank and Aggregator
+        # Refactor SpectralRank and Aggregator
         for group, choice in group_choice.items():
             # Get the m empirical estimate vector
             group_items = list(group)
@@ -55,6 +49,12 @@ class Aggregator():
             for i, item in enumerate(group_items):
                 group_choice[group][item] = p_hat[i]
 
+        # Keep track of di
+        self.ds_array  = np.zeros((n_items,))
+        for group in group_choice.keys():
+            for i in group:
+                self.ds_array[i] += 1
+
         return group_choice
 
     def project_to_probability_simplex(self, v):
@@ -64,8 +64,8 @@ class Aggregator():
         minimize 1/2 || x - v ||^2
         
         such that: 
-                    x >= 0
-                    x @ 1 = 1
+                x >= 0
+                x @ 1 = 1
     
         """
         k = len(v)
@@ -76,7 +76,9 @@ class Aggregator():
         prob = cp.Problem(objective, constraints)
         prob.solve()
 
-        return x.value
+        x_hat = np.maximum(x.value, 0)
+        x_hat = x_hat / x_hat.sum()
+        return x_hat
 
 
 class SpectralRank():
@@ -139,10 +141,11 @@ class SpectralRank():
         """
 
         """
-        self.pi = np.ones((self.n,))
+        # Start with a uniform distribution
+        self.pi = np.ones((self.n,)) / self.n
 
         for i in range(self.max_iters):
-            next_pi = np.matmul(self.P, self.pi)
+            next_pi = np.matmul(self.P.T, self.pi)
             if np.sum((next_pi - self.pi)**2) < self.tol:
                 self.pi = next_pi
                 break
@@ -150,3 +153,4 @@ class SpectralRank():
 
         # Compute the scores
         self.scores = self.pi / self.aggregator.ds_array
+        self.scores = self.scores / self.scores.sum()
