@@ -4,14 +4,6 @@ from spectral.privacy import randomized_response
 import collections
 
 
-"""
-- scores vs rank 
-- Rank 0 should have the highest score?
-
-- Some metrics work with scores and some with ranks. Have to somehow separate between
-these two types of metrics
-"""
-
 class LearningCurveExperiment():
     def __init__(self, estimator, data, scores=None, ranks=None,
             metrics=[ranks_kendall_tau, ranks_discounted_cummulative_gain]):
@@ -52,27 +44,40 @@ class LearningCurveExperiment():
         return error_curve
 
 class PrivacyCurveExperiment():
-    def __init__(self, estimator, data, scores, ranks,
-            metrics=[ranks_kendall_tau, ranks_discounted_cummulative_gain]):
+    def __init__(self, estimator, data, scores,
+                metrics=[ranks_kendall_tau, ranks_discounted_cummulative_gain, scores_l1],
+                init_param={}):
+
         self.estimator = estimator
         self.data = data
-        self.true_scores = scores
+        self.true_scores = np.array(scores)
         self.metrics = metrics
-        # TODO: compute true_ranks
+        self.init_param = init_param
+        self.true_ranks = self.get_true_ranks(scores)
 
-    def run(self, epsilons=np.logspace(-3, 1, 10)):
+    def get_true_ranks(self, scores):
+        return np.array(np.flip(np.argsort(scores)))
+
+    def run(self, epsilons=np.logspace(-2, 2, 20)):
+        """
+        """
         error_curve = {}
         error_curve["epsilon_vals"] = epsilons
         error_curve["metrics"] = collections.defaultdict(list)
 
         for eps in epsilons:
+            print(eps)
+            # Get noisy data
             noisy_data = randomized_response(self.data, eps)
-            estimator = self.estimator()
+            # Initialize the ranking algorithm
+            estimator = self.estimator(epsilon=eps, **self.init_param)
             r_hat = estimator.fit_and_rank(noisy_data)
             
             for metric in self.metrics:
+                # If rank metrics
                 if metric.__name__.startswith("ranks"):
                     error_curve["metrics"][metric.__name__].append(metric(self.true_ranks, r_hat))
+                # If score metrics
                 else:
                     w_hat = estimator.get_scores()
                     error_curve["metrics"][metric.__name__].append(metric(self.true_scores, w_hat))

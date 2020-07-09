@@ -8,7 +8,7 @@ def ranks_kendall_tau(r_hat, r):
     rankings
     """
     assert(r_hat.shape == r.shape)
-    return kendalltau(r_hat, r)
+    return kendalltau(r_hat, r).correlation
 
 def ranks_discounted_cummulative_gain(r_hat, r):
     """ Compute the discounted cummulative gain
@@ -40,7 +40,7 @@ def ranks_spearman_rho(r_hat, r):
     for i, item in enumerate(r_hat):
         y[item] = i+1
 
-    return spearmanr(x, y)
+    return spearmanr(x, y).correlation
 
 def scores_l1(w, w_hat):
     """ L1 distance between two weight vectors

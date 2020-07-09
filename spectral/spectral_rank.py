@@ -5,9 +5,21 @@ import collections
 class Aggregator():
     """ Aggregate the choice data to produce 
     (choice_set, statistics) tuples
+
+
+    Attributes:
+        epsilon: privacy parameter
+
+        all_items: the set of all items
+
+        group_choice: the dictionary of group -> preference frequency
+
+        ds_array: an array storing the di's
+
     """
-    def __init__(self, epsilon):
+    def __init__(self, epsilon, reg_k=0):
         self.epsilon = epsilon
+        self.reg_k = reg_k
 
     def aggregate_raw_statistics(self, data):
         """ Aggregate statistics
@@ -30,13 +42,12 @@ class Aggregator():
                 group_choice[key] = collections.defaultdict(int)
             group_choice[key][choice] += 1
         
-        # TODO: fix the case where p_hat still contains negative number
-        # Refactor SpectralRank and Aggregator
         for group, choice in group_choice.items():
             # Get the m empirical estimate vector
             group_items = list(group)
 
-            m = np.array([choice[item] for item in group_items])
+            # Add regularization term
+            m = np.array([choice[item] + self.reg_k for item in group_items])
             m = m/ np.sum(m)
 
             if self.epsilon == np.inf:
@@ -55,7 +66,9 @@ class Aggregator():
             for i in group:
                 self.ds_array[i] += 1
 
-        return group_choice
+        self.group_choice = group_choice
+
+        return self.group_choice, self.all_items, self.ds_array
 
     def project_to_probability_simplex(self, v):
         """ Project a vector onto the probability simplex by solving the
@@ -66,7 +79,6 @@ class Aggregator():
         such that: 
                 x >= 0
                 x @ 1 = 1
-    
         """
         k = len(v)
         x = cp.Variable(k)
@@ -76,24 +88,31 @@ class Aggregator():
         prob = cp.Problem(objective, constraints)
         prob.solve()
 
+        # Remove negative numbers and normalize
         x_hat = np.maximum(x.value, 0)
-        x_hat = x_hat / x_hat.sum()
+        x_hat = x_hat / x_hat.sum() 
         return x_hat
 
 
 class SpectralRank():
-    def __init__(self, reg_k, epsilon):
-        self.reg_k = reg_k
+    def __init__(self, epsilon, reg_k=0, max_iters=1000, tol=1e-6):
+        """
+
+        Attributes:
+
+        """
         self.epsilon = epsilon
-        self.aggregator = Aggregator(epsilon)
-        self.max_iters = 1000
-        self.tol = 1e-6
+        self.reg_k = reg_k
+        self.aggregator = Aggregator(epsilon, reg_k)
+        self.max_iters = max_iters
+        self.tol = tol
 
     def fit(self, data):
         """ Learn the BTL/MNL model
         """
         # Aggregate the statistics
-        self.group_choice = self.aggregator.aggregate_raw_statistics(data)
+        self.group_choice, self.all_items, self.ds_array\
+            = self.aggregator.aggregate_raw_statistics(data)
         # Construct matrix P
         self.construct_P()
         # Do power iteration
@@ -101,22 +120,20 @@ class SpectralRank():
 
     def fit_and_rank(self, data):
         """ 
-
         Return the list of items, from highest score to lowest score
-
         """
         self.fit(data)
         return self.get_ranks()
 
     def get_scores(self):
-        """
-
+        """ Get the scores of the items
         """
         return self.scores
 
     def get_ranks(self):
         """
-        Return the lst of items, from highest score to lowest score
+        Return the list of items (indices), 
+        from highest score to lowest score
         """
         assert(hasattr(self, "scores"))
         return np.flip(np.argsort(self.scores))
@@ -127,10 +144,10 @@ class SpectralRank():
         Assumption:
             The set of items is 0-based indexing, [n]
         """
-        all_items = self.aggregator.all_items
+        all_items = self.all_items
         self.n = len(all_items)
         self.P = np.zeros((self.n, self.n))
-        d = self.aggregator.ds_array
+        d = self.ds_array
 
         for (group, p_Sa) in self.group_choice.items():
             for i in group:
@@ -138,8 +155,7 @@ class SpectralRank():
                     self.P[i, j] += 1./d[i] * p_Sa[j]
             
     def find_stationary_distribution(self):
-        """
-
+        """ Compute the stationary distribution and the scores
         """
         # Start with a uniform distribution
         self.pi = np.ones((self.n,)) / self.n
@@ -152,5 +168,6 @@ class SpectralRank():
             self.pi = next_pi
 
         # Compute the scores
-        self.scores = self.pi / self.aggregator.ds_array
+        self.scores = self.pi / self.ds_array
+        # Normalize
         self.scores = self.scores / self.scores.sum()
