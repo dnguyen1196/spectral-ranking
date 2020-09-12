@@ -55,7 +55,10 @@ class Aggregator():
             else:
                 p_hat = m * (1 + np.exp(self.epsilon))/(np.exp(self.epsilon) - 1)\
                     - 1./(np.exp(self.epsilon)+1)
-                p_hat = self.project_to_probability_simplex(p_hat)
+
+                if np.any(p_hat <= 0):
+                    p_hat = self.project_to_probability_simplex(p_hat)
+                p_hat = p_hat/p_hat.sum()
 
             for i, item in enumerate(group_items):
                 group_choice[group][item] = p_hat[i]
@@ -83,7 +86,7 @@ class Aggregator():
         k = len(v)
         x = cp.Variable(k)
 
-        objective = cp.Minimize(0.5 * cp.norm2(x-v)**2)
+        objective = cp.Minimize(0.5 * cp.norm1(x-v))
         constraints = [cp.sum(x) == 1, x >= 0]
         prob = cp.Problem(objective, constraints)
         prob.solve()
@@ -95,7 +98,7 @@ class Aggregator():
 
 
 class SpectralRank():
-    def __init__(self, epsilon, reg_k=0, max_iters=1000, tol=1e-6):
+    def __init__(self, epsilon, reg_k=0, max_iters=1000, tol=1e-8):
         """
 
         Attributes:

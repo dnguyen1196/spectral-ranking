@@ -58,21 +58,22 @@ class PrivacyCurveExperiment():
     def get_true_ranks(self, scores):
         return np.array(np.flip(np.argsort(scores)))
 
-    def run(self, epsilons=np.logspace(-2, 2, 20)):
+    def run(self, epsilons=np.linspace(0, 3, 20)):
         """
         """
         error_curve = {}
         error_curve["epsilon_vals"] = epsilons
         error_curve["metrics"] = collections.defaultdict(list)
-
+        negative_loglik = []
         for eps in epsilons:
-            print(eps)
             # Get noisy data
             noisy_data = randomized_response(self.data, eps)
             # Initialize the ranking algorithm
             estimator = self.estimator(epsilon=eps, **self.init_param)
             r_hat = estimator.fit_and_rank(noisy_data)
-            
+            nll   = negative_lik_mnl(estimator.scores, self.data)
+            print(estimator.scores)
+            negative_loglik.append(nll)
             for metric in self.metrics:
                 # If rank metrics
                 if metric.__name__.startswith("ranks"):
@@ -81,7 +82,8 @@ class PrivacyCurveExperiment():
                 else:
                     w_hat = estimator.get_scores()
                     error_curve["metrics"][metric.__name__].append(metric(self.true_scores, w_hat))
-
+        
+        error_curve["metrics"]["nll"] = np.array(negative_loglik)
         return error_curve
 
 

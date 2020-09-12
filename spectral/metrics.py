@@ -47,3 +47,16 @@ def scores_l1(w, w_hat):
     """
     assert(w.shape == w_hat.shape)
     return np.sum(np.abs(w-w_hat))
+
+def negative_lik_mnl(w_hat, data):
+    """ Compute the negative log likelihood of the data
+    under the MNL model
+    """
+    nll = 0.
+    for (group, choice) in data:
+        score_group = np.array([w_hat[i] for i in group])
+        p_choice_data = w_hat[choice]/score_group.sum()
+        if p_choice_data == 0: # Avoid overflown error
+            continue
+        nll -= np.log(p_choice_data)
+    return nll

@@ -59,3 +59,7 @@ target/
 .vscode/
 
 spectral/data/dataset
+
+*.png 
+*.th
+*.ipynb
