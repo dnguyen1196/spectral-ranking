@@ -1,12 +1,26 @@
 import numpy as np
 import sys
+from math import factorial
+from itertools import combinations
+import operator as op
+from functools import reduce
+import collections
 
-def generate_data_MNL(N, weights, k):
+def ncr(n, r):
+    r = min(r, n-r)
+    numer = reduce(op.mul, range(n, n-r, -1), 1)
+    denom = reduce(op.mul, range(1, r+1), 1)
+    return numer // denom  # or / in Python 2
+
+# TODO: re-code this function
+
+def generate_data_MNL(N, L, weights, k, seed=2666):
     """ Generate choice data according to the MNL
     model
 
     Arg:
-        N: number of comparisons
+        N: number of unique choice groups
+        L: number of customers
         weights: scores of items
         k: comparison group size
 
@@ -16,12 +30,59 @@ def generate_data_MNL(N, weights, k):
     dataset = []
     n = len(weights)
 
-    for i in range(N):
-        group = np.random.choice(n, (k,), replace=False)
-        probs = np.array([weights[i] for i in group])
-        probs = probs / np.sum(probs) # Normalize
-        winner = np.random.choice(group, 1, p=probs)[0]
-        dataset.append((group, winner))
+    # First sample for N unique k choice sets
+    # from the universe of n items
+    assert (N <= ncr(n, k))
+    np.random.seed(seed)
+    all_groups = list(combinations(np.arange(n), k))
+    np.random.shuffle(all_groups)
+    unique_groups = all_groups[:N]
+
+    dataset = []
+    for group in unique_groups:
+        for i in range(L): # For each user
+            probs = np.array([weights[i] for i in group])
+            probs = probs / np.sum(probs) # Normalize
+            winner = np.random.choice(group, 1, p=probs)[0]
+            dataset.append((list(group), winner))
+
+    np.random.shuffle(dataset)
+    return dataset
+
+def generate_data_MNL_by_user(N, L, weights, k, seed=2666):
+    """ Generate choice data according to the MNL
+    model but returns the data separated into different users
+
+    Arg:
+        N: number of unique choice groups
+        L: number of customers
+        weights: scores of items
+        k: comparison group size
+
+    Returns:
+        list[user_choice]
+            where user_choice is list[(group, winner)]
+    """
+    dataset = []
+    n = len(weights)
+
+    # First sample for N unique k choice sets
+    # from the universe of n items
+    assert (N <= ncr(n, k))
+    np.random.seed(seed)
+    all_groups = list(combinations(np.arange(n), k))
+    np.random.shuffle(all_groups)
+    unique_groups = all_groups[:N]
+
+    dataset = []
+    for i in range(L): # For each user
+        user_choice = []
+        for group in unique_groups:
+            probs = np.array([weights[i] for i in group])
+            probs = probs / np.sum(probs) # Normalize
+            winner = np.random.choice(group, 1, p=probs)[0]
+            user_choice.append((list(group), winner))
+        dataset.append(user_choice)
 
     return dataset
 
@@ -75,3 +136,38 @@ def from_csv(file_name, multinomial_data=False):
         return dataset, len(items)
 
     return load
+
+
+def group_by_choice_sets(dataset):
+    grouped_data = collections.defaultdict(list)
+
+    for choice_group, winner in dataset:
+        grouped_data[tuple(choice_group)].append(winner)
+
+    return grouped_data
+
+def group_by_user(dataset):
+    """
+
+    all_data:
+        list[user_choice]
+            where
+            user_choice: []
+
+    """
+    data_by_choiceset = group_by_choice_sets(dataset)
+
+    choice_groups = list(data_by_choiceset.keys())
+    num_responses = [len(g) for _, g in data_by_choiceset.items()]
+    L             = max(num_responses)
+
+    all_data = []
+    for i in range(L):
+        user_choice = []
+        for choice_set in choice_groups:
+            winning_items = data_by_choiceset[choice_set]
+            if i < len(winning_items):            
+                user_choice.append((list(choice_set), winning_items[i]))
+        all_data.append(user_choice)
+
+    return all_data, choice_groups

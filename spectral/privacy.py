@@ -9,9 +9,20 @@ def randomized_response(responses, epsilon):
         k = len(items)
         other_choice = [c for c in items if c != choice]
 
-        if np.random.rand() > np.exp(epsilon)/(np.exp(epsilon)+k-1):
-            choice = np.random.choice(other_choice)
+        winner = choice
+        if epsilon == np.inf:
+            winner = choice
+        elif np.random.rand() > np.exp(epsilon)/(np.exp(epsilon)+k-1):
+            winner = np.random.choice(other_choice)
 
-        perturbed_responses.append((items, choice))
+        perturbed_responses.append((items, winner))
 
     return perturbed_responses
+
+
+def randomized_response_by_users(user_data, epsilon_overall):
+    responses = []
+    for user_choices in user_data:
+        N = len(user_choices)
+        responses.append(randomized_response(user_choices, epsilon_overall/N))
+    return responses

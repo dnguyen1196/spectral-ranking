@@ -1,6 +1,6 @@
 import numpy as np
 from spectral.metrics import *
-from spectral.privacy import randomized_response
+from spectral.privacy import randomized_response, randomized_response_by_users
 import collections
 
 
@@ -46,33 +46,54 @@ class LearningCurveExperiment():
 class PrivacyCurveExperiment():
     def __init__(self, estimator, data, scores,
                 metrics=[ranks_kendall_tau, ranks_discounted_cummulative_gain, scores_l1],
+                data_by_user=False,
                 init_param={}):
 
         self.estimator = estimator
         self.data = data
-        self.true_scores = np.array(scores)
         self.metrics = metrics
         self.init_param = init_param
-        self.true_ranks = self.get_true_ranks(scores)
+        if scores is not None:
+            self.true_scores = np.array(scores)
+            self.true_ranks = self.get_true_ranks(scores)
 
     def get_true_ranks(self, scores):
         return np.array(np.flip(np.argsort(scores)))
 
-    def run(self, epsilons=np.linspace(0, 3, 20)):
+    def run(self, epsilons=np.linspace(0, 3, 20), data_by_user=False):
         """
         """
         error_curve = {}
         error_curve["epsilon_vals"] = epsilons
         error_curve["metrics"] = collections.defaultdict(list)
+        error_curve["scores"] = []
         negative_loglik = []
+        self.learned_scores = []
+
         for eps in epsilons:
             # Get noisy data
-            noisy_data = randomized_response(self.data, eps)
+            if data_by_user:
+                user_data = randomized_response_by_users(self.data, eps)
+                noisy_data = []
+                for user_choices in user_data:
+                    noisy_data.extend(user_choices)
+            else:
+                noisy_data = randomized_response(self.data, eps)
             # Initialize the ranking algorithm
             estimator = self.estimator(epsilon=eps, **self.init_param)
             r_hat = estimator.fit_and_rank(noisy_data)
-            nll   = negative_lik_mnl(estimator.scores, self.data)
-            print(estimator.scores)
+            
+            self.learned_scores.append(estimator.get_scores())
+
+            if data_by_user:
+                all_data = []
+                for user_choices in user_data:
+                    all_data.extend(user_choices)
+                nll = negative_lik_mnl(estimator.scores, all_data)
+            else:
+                nll = negative_lik_mnl(estimator.scores, self.data)
+
+            # print(estimator.scores)
             negative_loglik.append(nll)
             for metric in self.metrics:
                 # If rank metrics

@@ -17,8 +17,9 @@ class Aggregator():
         ds_array: an array storing the di's
 
     """
-    def __init__(self, epsilon, reg_k=0):
+    def __init__(self, epsilon, n=None, reg_k=0):
         self.epsilon = epsilon
+        self.n_items = n
         self.reg_k = reg_k
 
     def aggregate_raw_statistics(self, data):
@@ -33,7 +34,10 @@ class Aggregator():
 
         for group, choice in data:
             self.all_items.update(group)
-        n_items = len(self.all_items)
+        if self.n_items is None:
+            n_items = len(self.all_items)
+        else:
+            n_items = self.n_items
 
         for group, choice in data:
             key = frozenset(group)
@@ -98,7 +102,7 @@ class Aggregator():
 
 
 class SpectralRank():
-    def __init__(self, epsilon, reg_k=0, max_iters=1000, tol=1e-8):
+    def __init__(self, epsilon, n_items=None, reg_k=0, max_iters=1000, tol=1e-8):
         """
 
         Attributes:
@@ -106,7 +110,8 @@ class SpectralRank():
         """
         self.epsilon = epsilon
         self.reg_k = reg_k
-        self.aggregator = Aggregator(epsilon, reg_k)
+        self.aggregator = Aggregator(epsilon, n_items, reg_k)
+        self.n_items = n_items
         self.max_iters = max_iters
         self.tol = tol
 
