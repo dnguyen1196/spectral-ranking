@@ -171,3 +171,79 @@ def group_by_user(dataset):
         all_data.append(user_choice)
 
     return all_data, choice_groups
+
+def generate_tree_graph(n, width=2, seed=2666):
+    """
+    n: Number of items
+    """
+    choice_groups = []
+    unvisited     = set(list(range(n)))
+
+    np.random.seed(seed)
+    # Generate the tree structure by BFS
+    root = np.random.choice(n)
+
+    frontier = [root]
+    unvisited.remove(root)
+
+    while len(frontier) > 0:
+        head = frontier.pop(0)
+        neighbors = np.random.choice(list(unvisited), min(width, len(unvisited)), False)
+        for i in neighbors:
+            choice_groups.append((head, i))
+            unvisited.remove(i)
+            frontier.append(i)
+
+    return choice_groups
+
+def generate_chain_graph(n, seed=2666):
+    """
+    
+    """
+    choice_groups = []
+
+    np.random.seed(seed)
+    chain = list(range(n))
+    np.random.shuffle(chain)
+
+    for i in range(len(chain)-1):
+        choice_groups.append((chain[i], chain[i+1]))
+
+    return choice_groups
+
+def generate_star_graph(n, seed=2666):
+    """
+    Generate a graph where there is only one center and the remaining
+    vertiices are connected only to the center
+    """
+    choice_groups = []
+
+    np.random.seed(seed)
+    center = np.random.choice(n)
+
+    for i in range(n):
+        if i != center:
+            choice_groups.append((center, i))
+
+    return choice_groups
+
+def generate_data_btl_by_user_with_special_topology(L, weights, top="tree", seed=2666):
+    n = len(weights)
+    if top == "tree":
+        choice_groups = generate_tree_graph(n, 2, seed)
+    elif top == "chain":
+        choice_groups = generate_chain_graph(n, seed)
+    else:
+        choice_groups = generate_star_graph(n, seed)
+
+    dataset = []
+    for i in range(L): # For each user
+        user_choice = []
+        for group in choice_groups:
+            probs = np.array([weights[i] for i in group])
+            probs = probs / np.sum(probs) # Normalize
+            winner = np.random.choice(group, 1, p=probs)[0]
+            user_choice.append((list(group), winner))
+        dataset.append(user_choice)
+
+    return dataset
