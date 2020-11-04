@@ -74,6 +74,16 @@ def generate_data_MNL_by_user(N, L, weights, k, seed=2666):
     np.random.shuffle(all_groups)
     unique_groups = all_groups[:N]
 
+    items = set()
+    for g in unique_groups:
+        for item in g:
+            items.add(item)
+    untouched = [i for i in range(n) if i not in items]
+    for i in untouched:
+        g = list(np.random.choice(n, k-1, False)) + [i]
+        unique_groups.append(np.array(g))
+    
+
     dataset = []
     for i in range(L): # For each user
         user_choice = []
@@ -172,31 +182,76 @@ def group_by_user(dataset):
 
     return all_data, choice_groups
 
-def generate_tree_graph(n, width=2, seed=2666):
+def generate_tree_graph(n, k=2, width=1, seed=2666):
     """
     n: Number of items
     """
     choice_groups = []
     unvisited     = set(list(range(n)))
+    visited       = set()
+    assert(width < k)
 
     np.random.seed(seed)
-    # Generate the tree structure by BFS
-    root = np.random.choice(n)
+    root_group = np.random.choice(list(range(n)), k, False)
 
-    frontier = [root]
-    unvisited.remove(root)
+    for i in root_group:
+        unvisited.remove(i)
+        visited.add(i)
+    choice_groups = [root_group]
+    frontier = [root_group]
 
-    while len(frontier) > 0:
-        head = frontier.pop(0)
-        neighbors = np.random.choice(list(unvisited), min(width, len(unvisited)), False)
-        for i in neighbors:
-            choice_groups.append((head, i))
-            unvisited.remove(i)
-            frontier.append(i)
+    while len(frontier) > 0 and len(unvisited) > 0:
+        par = frontier.pop(0)
+        # Pick some item to extend a new comparison group
+        next_pars = np.random.choice(par, width, False)
+        for p in next_pars:
+            if len(unvisited) < k:
+                next_group = list(unvisited) \
+                    + list(np.random.choice(list(visited), k-len(unvisited), False))
+                for i in next_group:
+                    if i in unvisited:
+                        unvisited.remove(i)
+                    visited.add(i)
+                choice_groups.append(next_group)
+                break
+
+            # Pick from the remaining unvisited
+            next_group = list(np.random.choice(list(unvisited), k-1, False))
+            next_group.append(p)
+
+            choice_groups.append(next_group)
+            frontier.append(next_group)
+            for i in next_group:
+                if i in unvisited:
+                    unvisited.remove(i)
+                visited.add(i)
+    return choice_groups
+
+def generate_chain_graph(n, k=2, seed=2666):
+    """
+    
+    """
+    assert (k >= 2)
+    choice_groups = []
+
+    np.random.seed(seed)
+    chain = list(range(n))
+    np.random.shuffle(chain)
+
+    i = 0
+    while i < n:
+        if i + k > n:
+            choice_groups.append(chain[-k:])
+            break
+
+        group = chain[i: i+k]
+        choice_groups.append(group)
+        i = i+k
 
     return choice_groups
 
-def generate_chain_graph(n, seed=2666):
+
+def generate_cycle_graph(n, k=2, seed=2666):
     """
     
     """
@@ -206,44 +261,152 @@ def generate_chain_graph(n, seed=2666):
     chain = list(range(n))
     np.random.shuffle(chain)
 
-    for i in range(len(chain)-1):
-        choice_groups.append((chain[i], chain[i+1]))
+    i = 0
+    while i < n:
+        if i + k > n:
+            group = chain[-k:]
+            choice_groups.append(group)
+            break
 
+        group = chain[i: i+k]
+        choice_groups.append(group)
+        i = i+k
+
+    group = [chain[-1]]
+    group.extend(chain[:k-1])
+    if (np.all(choice_groups[-1] == np.array(group))):
+        return choice_groups
+
+    choice_groups.append(group)
     return choice_groups
 
-def generate_star_graph(n, seed=2666):
+
+def generate_star_graph(n, k=2, seed=2666):
     """
     Generate a graph where there is only one center and the remaining
     vertiices are connected only to the center
     """
     choice_groups = []
-
+    # assert ((k == 2) or (n % (k-1) == 1)) # Simple fix to make sure we get equal group size
     np.random.seed(seed)
     center = np.random.choice(n)
 
-    for i in range(n):
-        if i != center:
-            choice_groups.append((center, i))
+    other = set([item for item in range(n) if item != center])
+
+    while (len(other) > 0):
+        if (len(other)) < k-1:
+            group_mem = list(other)
+            group_mem.append(center)
+
+            group = group_mem
+        else:
+            group_mem = np.random.choice(list(other), k-1, False)
+            group = list(group_mem)
+            group.append(center)
+            
+        choice_groups.append(group)
+        for i in group:
+            if i in other:
+                other.remove(i)
 
     return choice_groups
 
-def generate_data_btl_by_user_with_special_topology(L, weights, top="tree", seed=2666):
-    n = len(weights)
-    if top == "tree":
-        choice_groups = generate_tree_graph(n, 2, seed)
-    elif top == "chain":
-        choice_groups = generate_chain_graph(n, seed)
-    else:
-        choice_groups = generate_star_graph(n, seed)
 
+def generate_random_graph(n, N, k=5, seed=2666):
+    # First sample for N unique k choice sets
+    # from the universe of n items
+    assert (N <= ncr(n, k))
+    np.random.seed(seed)
+    all_groups = list(combinations(np.arange(n), k))
+    np.random.shuffle(all_groups)
+    unique_groups = all_groups[:N]
+
+    items = set()
+    for g in unique_groups:
+        for item in g:
+            items.add(item)
+    untouched = [i for i in range(n) if i not in items]
+    for i in untouched:
+        other = set(list(range(n)))
+        other.remove(i)
+        other_mem = np.random.choice(list(other), k-1, False)
+        g = list(other_mem) + [i]
+        unique_groups.append(g)
+
+    return unique_groups
+
+
+def generate_data_from_choice_groups(choice_groups, L, weights, seed=2666):
     dataset = []
-    for i in range(L): # For each user
+
+    all_data = []
+    np.random.seed(seed)
+    for group in choice_groups:
+        probs = np.array([weights[i] for i in group])
+        probs = probs / np.sum(probs) # Normalize
+
+        # Sample L times with specified probabilities
+        samples = np.random.choice(group, p=probs, size=(L,))
+        all_data.append(samples)
+
+    for l in range(L): # For each user
         user_choice = []
-        for group in choice_groups:
-            probs = np.array([weights[i] for i in group])
-            probs = probs / np.sum(probs) # Normalize
-            winner = np.random.choice(group, 1, p=probs)[0]
-            user_choice.append((list(group), winner))
+        for a, sample in enumerate(all_data):
+            user_choice.append((choice_groups[a], sample[l]))
         dataset.append(user_choice)
 
     return dataset
+
+
+def generate_choice_groups_by_topology(n, k=2, N=100, top="tree", seed=2666):
+    if top=="random":
+        choice_groups = generate_random_graph(n, N, k, seed)
+    elif top == "tree":
+        choice_groups = generate_tree_graph(n, k, k-1, seed)
+    elif top == "chain":
+        choice_groups = generate_chain_graph(n, k, seed)
+    elif top == "cycle":
+        choice_groups = generate_cycle_graph(n, k, seed)
+    else:
+        choice_groups = generate_star_graph(n, k, seed)
+    return choice_groups
+
+
+def generate_data_btl_by_user_with_special_topology(L, weights, k=2, N=100, top="tree", seed=2666):
+
+    n = len(weights)
+    choice_groups = generate_choice_groups_by_topology(n, k, N, top, seed)
+
+    dataset = []
+
+    all_data = []
+    np.random.seed(seed)
+    for group in choice_groups:
+        probs = np.array([weights[i] for i in group])
+        probs = probs / np.sum(probs) # Normalize
+
+        # Sample L times with specified probabilities
+        samples = np.random.choice(group, p=probs, size=(L,))
+        all_data.append(samples)
+
+    for l in range(L): # For each user
+        user_choice = []
+        for a, sample in enumerate(all_data):
+            user_choice.append((choice_groups[a], sample[l]))
+        dataset.append(user_choice)
+
+    return dataset
+
+
+def aggregate_by_choice_groups(users_data):
+    """
+
+    data: list[N]
+        data[a] = list[La]
+    """
+    data_by_group = collections.defaultdict(list)
+    for user_data in users_data:
+        for (group, y) in user_data:
+            data_by_group[group].append(y)
+
+    return data_by_group

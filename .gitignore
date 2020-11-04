@@ -63,3 +63,5 @@ spectral/data/dataset
 *.png 
 *.th
 *.ipynb
+
+scripts

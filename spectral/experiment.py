@@ -1,8 +1,10 @@
 import numpy as np
 from spectral.metrics import *
-from spectral.privacy import randomized_response, randomized_response_by_users
+from spectral.privacy import randomized_response, randomized_response_by_users,\
+    rappor_by_user, randomize_data_fast, rappor_fast
+from spectral.data.utils import aggregate_by_choice_groups
 import collections
-
+import time
 
 class LearningCurveExperiment():
     def __init__(self, estimator, data, scores=None, ranks=None,
@@ -45,7 +47,10 @@ class LearningCurveExperiment():
 
 class PrivacyCurveExperiment():
     def __init__(self, estimator, data, scores,
-                metrics=[ranks_kendall_tau, ranks_discounted_cummulative_gain, scores_l1],
+                metrics=[
+                    scores_l1,
+                    nll
+                ],
                 data_by_user=False,
                 init_param={}):
 
@@ -60,51 +65,58 @@ class PrivacyCurveExperiment():
     def get_true_ranks(self, scores):
         return np.array(np.flip(np.argsort(scores)))
 
-    def run(self, epsilons=np.linspace(0, 3, 20), data_by_user=False):
+    def run(self, epsilons=np.linspace(0, 3, 20), mechanism="rr", seed=2666):
         """
         """
         error_curve = {}
         error_curve["epsilon_vals"] = epsilons
         error_curve["metrics"] = collections.defaultdict(list)
-        error_curve["scores"] = []
+        error_curve["learned_scores"] = []
         negative_loglik = []
         self.learned_scores = []
 
+        true_data_by_choice_groups = aggregate_by_choice_groups(self.data)
+
         for eps in epsilons:
-            # Get noisy data
-            if data_by_user:
-                user_data = randomized_response_by_users(self.data, eps)
-                noisy_data = []
-                for user_choices in user_data:
-                    noisy_data.extend(user_choices)
+            start = time.time()
+            if mechanism == "rr":
+                noisy_data_by_group = randomize_data_fast(true_data_by_choice_groups, eps, seed=seed)
             else:
-                noisy_data = randomized_response(self.data, eps)
+                noisy_data_by_group = rappor_fast(true_data_by_choice_groups, eps, seed=seed)
+                
+            end = time.time()
+            print(f"epsilon = {eps}, randomizing data: {end-start}", end=" ")
+
             # Initialize the ranking algorithm
-            estimator = self.estimator(epsilon=eps, **self.init_param)
-            r_hat = estimator.fit_and_rank(noisy_data)
-            
+            start = time.time()
+            estimator = self.estimator(epsilon=eps, mechanism=mechanism, **self.init_param)
+            r_hat = estimator.fit_and_rank(noisy_data_by_group)
+            end = time.time()
+            print(f"learning: {end-start}", end=" ")
+
+            # Save the learned scores
             self.learned_scores.append(estimator.get_scores())
+            error_curve["learned_scores"].append(estimator.get_scores())
 
-            if data_by_user:
-                all_data = []
-                for user_choices in user_data:
-                    all_data.extend(user_choices)
-                nll = negative_lik_mnl(estimator.scores, all_data)
-            else:
-                nll = negative_lik_mnl(estimator.scores, self.data)
+            # Evaluate NLL on ACTUAL private data
+            start = time.time()
 
-            # print(estimator.scores)
-            negative_loglik.append(nll)
             for metric in self.metrics:
                 # If rank metrics
                 if metric.__name__.startswith("ranks"):
                     error_curve["metrics"][metric.__name__].append(metric(self.true_ranks, r_hat))
-                # If score metrics
+
+                # If negative log likelihood
+                elif metric.__name__.startswith("nll"):
+                    error_curve["metrics"][metric.__name__].append(
+                        nll(estimator.scores, true_data_by_choice_groups))
                 else:
+                    # If score metrics
                     w_hat = estimator.get_scores()
                     error_curve["metrics"][metric.__name__].append(metric(self.true_scores, w_hat))
-        
-        error_curve["metrics"]["nll"] = np.array(negative_loglik)
+            end = time.time()
+            print(f"evaluation: {end-start}")
+
         return error_curve
 
 

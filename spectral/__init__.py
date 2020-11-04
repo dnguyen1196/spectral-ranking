@@ -1,6 +1,6 @@
 import spectral.metrics
 import spectral.privacy
 import spectral.experiment
-from spectral.spectral_rank import SpectralRank
+from spectral.regularized_spectral_rank import RegularizedSpectralRank
 import spectral.data
 from spectral.adversarial import Adversary, AdversaryRefined
