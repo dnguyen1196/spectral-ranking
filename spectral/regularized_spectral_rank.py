@@ -38,28 +38,6 @@ class Aggregator():
         all_items = set()
         k_min = np.inf
 
-        # This loop is expensive
-        # for user_data in data_by_choice_group:
-        #     for (group, y) in user_data:
-        #         t_group = tuple(group)
-        #         k_min = min(k_min, len(group))
-
-        #         L_Sa[t_group] += 1
-        #         all_items.update(t_group)
-
-        #         if t_group not in group_choice:
-        #             group_choice[t_group] = {}
-        #             for item in group:
-        #                 group_choice[t_group][item] = 0
-
-        #         # In rr, the randomized output is a single choice
-        #         if self.mechanism == "rr":
-        #             group_choice[t_group][y] += 1
-        #         else:
-        #         # In rappor, the randomized output is a vector
-        #             for i, item in enumerate(group):
-        #                 group_choice[t_group][item] += y[i]
-
         for (group, choices) in data_by_choice_group.items():
             t_group = tuple(group)
             all_items.update(t_group)
@@ -70,15 +48,15 @@ class Aggregator():
             for item in group:
                 group_choice[t_group][item] = 0
 
-            # This for loop could be fastened / removed
-            for y in choices:
-                # In rr, the randomized output is a single choice
-                if self.mechanism == "rr":
+            if self.mechanism == "rr":
+                for y in choices:
+                    # In rr, the randomized output is a single choice
                     group_choice[t_group][y] += 1
-                else:
-                # In rappor, the randomized output is a vector
-                    for i, item in enumerate(group):
-                        group_choice[t_group][item] += y[i]
+            else:
+                # choice is shape (L, k)
+                y_sum = np.sum(choices, axis=0)
+                for i, item in enumerate(group):
+                    group_choice[t_group][item] += y_sum[i]
 
         n = len(all_items)
 

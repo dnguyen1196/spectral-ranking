@@ -11,5 +11,3 @@ sfshop = from_csv(os.path.dirname(utils.__file__)+ "/dataset/SF/SFshop.csv", Tru
 sfwork = from_csv(os.path.dirname(utils.__file__) + "/dataset/SF/SFwork.csv", True)
 
 youtube = from_csv(os.path.dirname(utils.__file__) + "/dataset/Youtube/Youtube.csv", False)
-
-gif_anger = from_csv(os.path.dirname(utils.__file__) + "/dataset/GIF-anger/GIF-anger.csv", False)
