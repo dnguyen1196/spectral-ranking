@@ -77,6 +77,9 @@ class PrivacyCurveExperiment():
 
         true_data_by_choice_groups = aggregate_by_choice_groups(self.data)
 
+        # Delete the data to save some space
+        del(self.data)
+
         for eps in epsilons:
             start = time.time()
             if mechanism == "rr":
