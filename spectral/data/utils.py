@@ -407,6 +407,6 @@ def aggregate_by_choice_groups(users_data):
     data_by_group = collections.defaultdict(list)
     for user_data in users_data:
         for (group, y) in user_data:
-            data_by_group[group].append(y)
+            data_by_group[tuple(group)].append(y)
 
     return data_by_group
