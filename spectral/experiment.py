@@ -88,14 +88,12 @@ class PrivacyCurveExperiment():
                 noisy_data_by_group = rappor_fast(true_data_by_choice_groups, eps, seed=seed)
                 
             end = time.time()
-            print(f"epsilon = {eps}, randomizing data: {end-start}", end=" ")
 
             # Initialize the ranking algorithm
             start = time.time()
             estimator = self.estimator(epsilon=eps, mechanism=mechanism, **self.init_param)
             r_hat = estimator.fit_and_rank(noisy_data_by_group)
             end = time.time()
-            print(f"learning: {end-start}", end=" ")
 
             # Save the learned scores
             self.learned_scores.append(estimator.get_scores())
@@ -118,7 +116,6 @@ class PrivacyCurveExperiment():
                     w_hat = estimator.get_scores()
                     error_curve["metrics"][metric.__name__].append(metric(self.true_scores, w_hat))
             end = time.time()
-            print(f"evaluation: {end-start}")
 
         return error_curve
 

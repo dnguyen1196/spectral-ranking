@@ -42,10 +42,8 @@ def randomize_data_fast(data_by_choice_group, eps, seed=2666):
                 other_items[i] = others
 
             L = len(choices)
-            k = len(group)
             # Pre-flip L coins
             coin_flips = np.random.rand(L)
-
             # Pre-pick replacements (one of k-1)
             alternatives = np.random.choice(k-1, (L,))
 
@@ -54,10 +52,10 @@ def randomize_data_fast(data_by_choice_group, eps, seed=2666):
             flipped_indices = np.argwhere(coin_flips > cutoff).flatten()
 
             all_other_choices = [other_items[y] for y in choices]
+
             all_alternatives  = [all_other_choices[ind][alternatives[ind]] for ind in flipped_indices]
 
             y_rr[flipped_indices] = np.array(all_alternatives)
-
             responses[group] = y_rr
 
     return responses
@@ -103,21 +101,37 @@ def rappor_fast(data_by_choice_group, eps, seed=2666):
             responses[group] = y_onehot
 
         else:
-            cutoff = np.exp(eps/2)/(np.exp(eps/2)+1)
+            cutoff = np.exp(eps/2.)/(np.exp(eps/2.)+1.)
             L = len(choices)
             choice_ind = dict([(y, i) for i, y in enumerate(group)])
             k = len(group)
             y_rappor = np.zeros((L, k))
-            coinflips = np.random.rand(L, k)
-            y_rappor[np.argwhere(coinflips > cutoff)] = 1
 
-            coinflips = np.random.rand(L)
-            for i in range(L):
-                y = choices[i]
-                if coinflips[i] < cutoff:
-                    y_rappor[i, choice_ind[y]] = 1
-                else:
-                    y_rappor[i, choice_ind[y]] = 0
+            # each entry is uniformly random [0,1]
+            coinflips = np.random.rand(L, k)
+
+            for (i, y) in enumerate(choices):
+                for j in range(k):
+                    if coinflips[i, j] < cutoff:
+                        # With probability e^eps/2(1+e^eps/2), keep the same
+                        # label
+                        y_rappor[i, j] = 0 if choice_ind[y] != j else 1
+                    else:
+                        # With remaining probability, flip the label
+                        y_rappor[i, j] = 1 if choice_ind[y] != j else 0
+
+
+            # With probability 1- (e^ep/2)(e^ep/2+1), a 0-label gets flipped on
+            # y_rappor[np.argwhere(coinflips > cutoff)] = 1
+
+            # coinflips = np.random.rand(L)
+            # for i in range(L):
+            #     if coinflips[i] < cutoff:
+            #         # Unflipped winning label
+            #         y_rappor[i, choice_ind[choices[i]]] = 1
+            #     else:
+            #         # Flipped winning label
+            #         y_rappor[i, choice_ind[choices[i]]] = 0
 
             responses[group] = y_rappor
 

@@ -16,13 +16,13 @@ class Aggregator():
         
         def recover_p_krr(m, eps):
             k = len(m)
-            p_hat = m * (1 + k + np.exp(eps))/(np.exp(eps) - 1)\
+            p_hat = m * (-1 + k + np.exp(eps))/(np.exp(eps) - 1)\
                     - 1./(np.exp(eps)-1)
             return p_hat
 
         def recover_p_rappor(m, eps):
-            p_hat = m * (1 + np.exp(eps/2))/(np.exp(eps/2)-1)\
-                    - 1./(np.exp(eps/2)-1)
+            p_hat = m * (1. + np.exp(eps/2.))/(np.exp(eps/2.)-1.)\
+                    - 1./(np.exp(eps/2.)-1.)
             return p_hat
 
         self.recover_p_rr = recover_p_krr
@@ -65,15 +65,17 @@ class Aggregator():
         for group, count in group_choice.items():
             group_items = list(group)
             m = np.array([count[item] for item in group_items])
-            m = m/ L_Sa[group]
 
             # Attempt to recover true winning probabilities
             if self.epsilon == np.inf:
+                m /= m.sum()
                 p_hat = m
             else:
                 if self.mechanism == "rr":
+                    m /= m.sum()
                     p_hat = self.recover_p_rr(m, self.epsilon)
                 else:
+                    m /= L_Sa[group]
                     p_hat = self.recover_p_rappor(m, self.epsilon)
 
             p_hat_arr.append(p_hat)
@@ -86,6 +88,7 @@ class Aggregator():
             D_proj = self.project(p_hat_arr, np.sqrt(np.log2(n))/(L * k_min**2))
             for a, group in enumerate(group_choice.keys()):
                 for i, item in enumerate(list(group)):
+                    # group_choice[group][item] = p_hat_arr[a][i]
                     group_choice[group][item] = D_proj[a][i]
         
         ds_array = np.zeros((n,))
@@ -109,7 +112,7 @@ class Aggregator():
         x = cp.Variable(k)
 
         objective = cp.Minimize(0.5 * cp.norm1(x-v))
-        constraints = [cp.sum(x) == 1, x >= delta, x <= 1- delta]
+        constraints = [cp.sum(x) == 1, x >= delta] #, x <= 1- delta] <---------- Do we only need lower bound
         prob = cp.Problem(objective, constraints)
         prob.solve()
 
@@ -134,15 +137,17 @@ class Aggregator():
                 a[i] = 1
                 A.append(a)
                 l.append(delta)
-                u.append(1-delta)
+                u.append(1-delta) # <------------- Do we only need lower bound
+                # u.append(1)
             linearconstraint = LinearConstraint(A,l,u)
             x_0 = np.array(d_u)
             y = np.array(d_u)
-            for i in range(k):
-                if d_u[i] > 1: 
-                    x_0[i] = 1
-                elif d_u[i] < 0: 
-                    x_0[i] = 0
+
+            # for i in range(k):
+            #     if d_u[i] > 1: 
+            #         x_0[i] = 1
+            #     elif d_u[i] < 0: 
+            #         x_0[i] = 0
             res = minimize(l1,x_0,args=y,constraints=linearconstraint)
             D_proj.append(res.x.tolist())
         return D_proj
