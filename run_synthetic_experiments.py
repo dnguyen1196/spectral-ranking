@@ -1,4 +1,5 @@
 import argparse
+import numpy as np
 
 arg_parser = argparse.ArgumentParser("Run synthetic experiments")
 
@@ -9,9 +10,8 @@ arg_parser.add_argument("--top", type=str, choices=["random", "star", "chain"], 
 arg_parser.add_argument("--n_trials", type=int, default=50, help="Number of trials")
 arg_parser.add_argument("--reg_l", type=float, default=0.0, help="Regularization parameter")
 arg_parser.add_argument("--output_folder", type=str, default="synthetic_exp_output", help="Output folder for synthetic experiments")
-arg_parser.add_argument('--eps', nargs="+", type=float, default=[0.5, 0.75, 1, 1.5, 3], help="Epsilon values")
-
-
+arg_parser.add_argument('--eps', nargs="+", type=float, default=[0.1, 0.25, 0.5, 0.75, 1, 1.5, 3, np.inf], help="Epsilon values")
+arg_parser.add_argument("--method", type=str, default="rappor", help="Privatization method", choices=["rappor", "rr"])
 
 args = arg_parser.parse_args()
 n = args.n
@@ -22,21 +22,20 @@ n_trials = args.n_trials
 reg_l = args.reg_l
 output_folder = args.output_folder
 eps = args.eps
+method = args.method
 
 import spectral
-import numpy as np
 from spectral.regularized_spectral_rank import RegularizedSpectralRank
 import time
 import os
 import torch
 
-L0 = 1000
-n_exp = 20
+L0 = 4000
+n_exp = 10
 
 # If the output folder does not exist, make it
 if not os.path.isdir(output_folder):
     os.mkdir(output_folder)
-
 
 all_L_curves = []
 
@@ -58,7 +57,7 @@ for l in range(n_exp): # For increasing L (number of users)
         # Run experiments
         start = time.time()
         experiment = spectral.experiment.PrivacyCurveExperiment(RegularizedSpectralRank, synthetic_data, scores_true)
-        error_curve = experiment.run(eps, "rappor", seed=None)
+        error_curve = experiment.run(eps, method, seed=None)
         end = time.time()
 
         # Save to file
