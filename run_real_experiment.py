@@ -63,4 +63,4 @@ for i in range(n_trials): # For each trial
     print(error_curve["metrics"]["nll"])
     print(f"Trial {i} took {end - start}")
 
-    torch.save(all_error_curves, os.path.join(output_folder, f"{data_set}.pkl"))
+    torch.save(all_error_curves, os.path.join(output_folder, f"{data_set}_{method}.pkl"))
