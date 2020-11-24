@@ -68,11 +68,11 @@ class Aggregator():
 
             # Attempt to recover true winning probabilities
             if self.epsilon == np.inf:
-                m /= m.sum()
+                m = m/ m.sum()
                 p_hat = m
             else:
                 if self.mechanism == "rr":
-                    m /= m.sum()
+                    m = m / m.sum()
                     p_hat = self.recover_p_rr(m, self.epsilon)
                 else:
                     m /= L_Sa[group]
