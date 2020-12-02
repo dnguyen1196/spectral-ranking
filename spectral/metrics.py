@@ -30,7 +30,7 @@ def ranks_spearman_rho(r_hat, r):
     """ Compute the spearman rank coefficient of
     two rankings
     """
-    assert(r_hat.shape == r.shape)
+    assert(len(r_hat) == len(r))
     n_items = len(r_hat)
     x = np.zeros((n_items,))
     y = np.zeros((n_items,))

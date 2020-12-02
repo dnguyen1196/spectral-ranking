@@ -1,10 +1,10 @@
-import numpy as np
-import cvxpy as cp
-import collections
 from scipy.optimize import minimize
 from scipy.optimize import LinearConstraint
 from scipy.sparse.linalg import eigs
-
+import numpy as np
+import cvxpy as cp
+import collections
+from .pwlistorder import kwiksort
 
 class Aggregator():
     """ Aggregate the choice data to produce 
@@ -139,101 +139,84 @@ class Aggregator():
                 a[i] = 1
                 A.append(a)
                 l.append(delta)
-                u.append(1-delta) # <------------- Do we only need lower bound
-                # u.append(1)
+                u.append(1-delta)
             linearconstraint = LinearConstraint(A,l,u)
             x_0 = np.array(d_u)
             y = np.array(d_u)
 
-            # for i in range(k):
-            #     if d_u[i] > 1: 
-            #         x_0[i] = 1
-            #     elif d_u[i] < 0: 
-            #         x_0[i] = 0
             res = minimize(l1,x_0,args=y,constraints=linearconstraint)
             D_proj.append(res.x.tolist())
         return D_proj
 
-
-class RegularizedSpectralRank():
-    def __init__(self, epsilon, mechanism="rr", reg_l=0, max_iters=10000, tol=1e-12):
-        """
-
-        Attributes:
-
-        """
+class KwikSort():
+    def __init__(self, epsilon, mechanism="rr", reg_l=0):
         self.epsilon = epsilon
         self.mechanism = mechanism
         self.reg_l = reg_l
-        self.max_iters = max_iters
-        self.tol = tol
 
     def fit(self, data_by_choice_group):
-        """ Learn the BTL/MNL model
-        """
         # Aggregate the statistics
-        self.aggregator = Aggregator(self.epsilon, self.mechanism, self.reg_l)
+        self.aggregator = Aggregator(np.inf, reg_l=self.reg_l)
 
         self.group_choice, self.n, self.ds_array,\
             self.L_Sa\
                 = self.aggregator.aggregate_raw_statistics(data_by_choice_group)
 
-        # Construct matrix P
-        self.construct_P()
-        # Do power iteration
-        self.find_stationary_distribution()
+        list_els = [i for i in range(self.n)]
+        pref_dict = self.get_preference_dict_generalized(self.group_choice, self.L_Sa)
+
+        self.ranks = kwiksort(pref_dict, list_els, runs=1000, random_seed=None)
+        # Run KwikSort on cmp data
 
     def fit_and_rank(self, data_by_choice_group):
-        """ 
-        Return the list of items, from highest score to lowest score
-        """
         self.fit(data_by_choice_group)
-        return self.get_ranks()
-
-    def get_scores(self):
-        """ Get the scores of the items
-        """
-        return self.scores
+        return self.ranks
 
     def get_ranks(self):
-        """
-        Return the list of items (indices), 
-        from highest score to lowest score
-        """
-        assert(hasattr(self, "scores"))
-        return np.flip(np.argsort(self.scores))
+        return self.ranks
 
-    def construct_P(self):
-        """
+    def get_scores(self):
+        return None
 
-        Assumption:
-            The set of items is 0-based indexing, [n]
-        """
-        self.P = np.zeros((self.n, self.n))
-        d = self.ds_array
+    def get_preference_dict(self, group_choice, L_Sa):
+        pref_dict = {}
+        for group, p in group_choice.items():
+            sorted_group = sorted(list(group))
+            item1 = sorted_group[0]
+            item2 = sorted_group[1]
+            sorted_group = tuple(sorted_group)
+            assert(sorted_group not in pref_dict)
+            L = L_Sa[group]
 
-        for (Sa, p_Sa) in self.group_choice.items():
-            for i in Sa:
-                for j in Sa:
-                    # P'ij = 1/d'[i] sum (n_j|Sa + lambda)/|Sa|
-                    self.P[i, j] += 1./d[i] *\
-                        (p_Sa[j] * self.L_Sa[Sa] + self.reg_l)/len(Sa)
-            
-    def find_stationary_distribution(self):
-        """ Compute the stationary distribution and the scores
-        """
-        # Start with a uniform distribution
-        self.pi = np.ones((self.n,)) / self.n
+            pref_dict[sorted_group] = int(L * p[item1] - L*p[item2])
 
-        for i in range(self.max_iters):
-            next_pi = np.matmul(self.P.T, self.pi)
-            next_pi /= next_pi.sum()
-            if np.sum((next_pi - self.pi)**2) < self.tol:
-                self.pi = next_pi
-                break
-            self.pi = next_pi
-        
-        # Compute the scores
-        self.scores = self.pi / self.ds_array
-        # Normalize
-        self.scores = self.scores / self.scores.sum()
+        return pref_dict
+
+    def get_preference_dict_generalized(self, group_choice, L_Sa):
+        pref_dict = collections.defaultdict(int)
+
+        for group, p in group_choice.items():
+            L = L_Sa[group]
+            sorted_group = sorted(list(group))
+            # Break down into pairwise comparisons here
+            all_pairs = self.get_all_pairs(sorted_group)
+
+            # How to deal with the case where the same pair appears
+            # in different groups, just add?
+            for pair in all_pairs:
+                e1 = pair[0]
+                e2 = pair[1]
+                pref_dict[tuple(pair)] += int(L*p[e1] - L*p[e2])
+
+        return pref_dict
+
+    def get_all_pairs(self, ls):
+        all_pairs = []
+        for i in range(len(ls)-1):
+            for j in range(i+1, len(ls)):
+                all_pairs.append((ls[i], ls[j]))
+        return all_pairs
+
+    
+
+
