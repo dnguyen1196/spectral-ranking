@@ -1,0 +1,42 @@
+Sender: LSF System <lsfadmin@ls03>
+Subject: Job 18446512: <real-asr> in cluster <lila> Exited
+
+Job <real-asr> was submitted from host <lilac> by user <nguyenm5> in cluster <lila> at Sun Nov 29 11:47:35 2020
+Job was executed on host(s) <4*ls03>, in queue <cpuqueue>, as user <nguyenm5> in cluster <lila> at Sun Nov 29 11:47:36 2020
+</home/nguyenm5> was used as the home directory.
+</home/nguyenm5/coding/spectral-ranking> was used as the working directory.
+Started at Sun Nov 29 11:47:36 2020
+Terminated at Thu Dec  3 11:47:36 2020
+Results reported at Thu Dec  3 11:47:36 2020
+
+Your job looked like:
+
+------------------------------------------------------------
+# LSBATCH: User input
+/home/nguyenm5/anaconda3/envs/pinot/bin/python /home/nguyenm5/coding/spectral-ranking/run_real_experiment.py --method rappor --data youtube --output_folder /home/nguyenm5/coding/spectral-ranking/real_output
+------------------------------------------------------------
+
+TERM_RUNLIMIT: job killed after reaching LSF run time limit.
+Exited with exit code 140.
+
+Resource usage summary:
+
+    CPU time :                                   908393.12 sec.
+    Max Memory :                                 4 GB
+    Average Memory :                             2.69 GB
+    Total Requested Memory :                     16.00 GB
+    Delta Memory :                               12.00 GB
+    Max Swap :                                   -
+    Max Processes :                              3
+    Max Threads :                                7
+    Run time :                                   345601 sec.
+    Turnaround time :                            345601 sec.
+
+The output (if any) follows:
+
+
+
+PS:
+
+Read file </home/nguyenm5/coding/spectral-ranking/logs/youtube_rappor.stderr> for stderr output of this job.
+
