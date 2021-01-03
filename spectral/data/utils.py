@@ -270,7 +270,7 @@ def generate_cycle_graph(n, k=2, seed=2666):
 
         group = chain[i: i+k]
         choice_groups.append(group)
-        i = i+k
+        i = i+k-1
 
     group = [chain[-1]]
     group.extend(chain[:k-1])
